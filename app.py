@@ -137,6 +137,59 @@ st.divider()
 # =========================
 # 기록 조회/통계
 # =========================
+# -------------------------
+# 날짜별 기록 빠르게 조회
+# -------------------------
+st.subheader("📅 날짜별 기록 조회")
+
+from datetime import timedelta
+
+col_y1, col_y2 = st.columns([1, 1])
+
+with col_y1:
+    view_date = st.date_input(
+        "조회할 날짜 선택",
+        value=datetime.now().date() - timedelta(days=1)
+    )
+
+with col_y2:
+    st.markdown(" ")
+    st.markdown(" ")
+    if st.button("⬅️ 어제 보기"):
+        view_date = datetime.now().date() - timedelta(days=1)
+
+view_date_str = view_date.strftime("%Y-%m-%d")
+
+if df.empty:
+    st.info("아직 저장된 기록이 없습니다.")
+else:
+    view_df = df[df["date"] == view_date_str]
+
+    if view_df.empty:
+        st.warning(f"{view_date_str} 기록이 없습니다.")
+    else:
+        show = view_df.copy()
+        show["wake_on_time"] = show["wake_on_time"].map({1: "✅", 0: "❌"})
+        show["cold_shower"] = show["cold_shower"].map({1: "✅", 0: "❌"})
+        show["yoga"] = show["yoga"].map({1: "✅", 0: "❌"})
+        show["warm_water"] = show["warm_water"].map({1: "✅", 0: "❌"})
+        show["fasting_ok"] = show["fasting_ok"].map({1: "✅", 0: "❌"})
+
+        st.success(f"📌 {view_date_str} 기록")
+        st.dataframe(
+            show[
+                [
+                    "date", "wake_time", "wake_on_time",
+                    "cold_shower", "yoga", "warm_water",
+                    "last_meal", "first_meal",
+                    "fasting_hours", "fasting_ok",
+                    "score", "note"
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True
+        )
+
 st.subheader("기록 보기")
 
 if df.empty:
@@ -155,6 +208,42 @@ else:
         use_container_width=True,
         hide_index=True
     )
+# -------------------------
+# 최근 7일 점수 그래프
+# -------------------------
+st.subheader("📊 최근 7일 루틴 점수")
+
+if df.empty:
+    st.info("아직 그래프를 표시할 기록이 없습니다.")
+else:
+    dfg = df.copy()
+    dfg["date_dt"] = pd.to_datetime(dfg["date"], errors="coerce")
+    dfg = dfg.dropna(subset=["date_dt"])
+
+    if dfg.empty:
+        st.info("날짜 데이터가 올바르지 않습니다.")
+    else:
+        end_date = dfg["date_dt"].max()
+        start_date = end_date - pd.Timedelta(days=6)
+
+        last7 = dfg[
+            (dfg["date_dt"] >= start_date) &
+            (dfg["date_dt"] <= end_date)
+        ].sort_values("date_dt")
+
+        if last7.empty:
+            st.info("최근 7일 기록이 없습니다.")
+        else:
+            st.line_chart(
+                last7.set_index("date_dt")["score"],
+                height=260
+            )
+
+            avg_score = last7["score"].mean()
+
+            st.caption(
+                f"📈 최근 7일 평균 점수: **{avg_score:.2f} / 5**"
+            )
 
     st.subheader("최근 통계")
     days = st.slider("최근 며칠?", min_value=3, max_value=60, value=7, step=1)
@@ -185,3 +274,4 @@ else:
     )
 
 st.caption("※ 같은 날짜는 저장 시 자동으로 덮어씁니다.")
+
